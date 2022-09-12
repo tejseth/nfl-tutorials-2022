@@ -1,3 +1,5 @@
+# download r and r studio here: http://mathcenter.oxford.emory.edu/site/math117/installRStudio/
+
 # remove the '#' if you haven't installed these packages already
 
 # install.packages("tidyverse")
