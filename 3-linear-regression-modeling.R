@@ -78,7 +78,7 @@ summary(log_fourth_co)
 
 # Checking the prediction probabilities
 fourth_downs |> 
-  mutate(pred_prob = log_fourth$fitted.values) %>%
+  mutate(pred_prob = log_fourth$fitted.values) |> 
   ggplot(aes(x = ydstogo)) +
   geom_line(aes(y = pred_prob), color = "black", size = 2) +
   geom_point(aes(y = went_for_it, color = ifelse(went_for_it == 1, "darkgreen", "darkred")), 
@@ -89,8 +89,8 @@ fourth_downs |>
        y = "Chance Offense Will Go For It (0-1)")
 
 # Getting fourth down go's over expected
-fourth_downs <- fourth_downs %>%
-  mutate(pred_prob = log_fourth$fitted.values) %>%
+fourth_downs <- fourth_downs |> 
+  mutate(pred_prob = log_fourth$fitted.values) |> 
   mutate(fourth_oe = went_for_it - pred_prob)
 
 # Team stats for 2022
@@ -121,7 +121,7 @@ team_fourth_22 |>
 ###################### Making Linear Regression Model ########################
 
 pass_plays <- pbp |> 
-  filter(pass == 1) %>%
+  filter(pass == 1) |> 
   filter(!is.na(air_yards), !is.na(down), !is.na(wp),
          !is.na(ydstogo), !is.na(half_seconds_remaining)) 
 
@@ -174,5 +174,5 @@ ayoe_22 |>
        subtitle = "Minimum of 140 passes on the season") +
   theme_minimal() +
   theme(panel.grid.major.y = element_blank()) 
- 
+
 
