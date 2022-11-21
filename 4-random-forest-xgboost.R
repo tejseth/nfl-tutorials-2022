@@ -87,5 +87,92 @@ fg_preds_joined |>
   summarize(kicks_oe_made = sum(fg_oe)) |> 
   arrange(-kicks_oe_made)
 
+##################### Let's make rushing yards over expected ################
+
+# Getting just rushes
+rush_attempts <- pbp |> 
+  filter(rush_attempt == 1, qb_scramble == 0, 
+         qb_dropback == 0, !is.na(yards_gained))
+
+# Making defensive yards per carry
+def_ypc <- rush_attempts |> 
+  filter(!is.na(defteam)) |> 
+  group_by(season, defteam) |> 
+  summarize(def_ypc = mean(yards_gained))
+
+rush_attempts <- rush_attempts |> 
+  left_join(def_ypc, by = c("season", "defteam"))
+
+# Getting the join dataset ready
+rushing_data_join <- rush_attempts |> 
+  select(label = yards_gained, yardline_100, quarter_seconds_remaining, half_seconds_remaining,
+         game_seconds_remaining, qtr, down, ydstogo, shotgun, no_huddle,
+         ep, wp, def_ypc, rusher_player_name, posteam, defteam) |> 
+  filter(!is.na(label)) |> 
+  filter(!is.na(down))
+
+rushes <- rushing_data_join |> 
+  select(-rusher_player_name, -posteam, -defteam)
+
+str(rushes)
+
+# Creating factors
+rushes$down <- as.factor(rushes$down)
+rushes$shotgun <- as.factor(rushes$shotgun)
+rushes$no_huddle <- as.factor(rushes$no_huddle)
+
+# One hot encoding
+dmy <- dummyVars(" ~ .", data = rushes)
+rushing_model_data <- data.frame(predict(dmy, newdata = rushes))
+
+colSums(is.na(rushing_model_data))
+
+# Making train and test datasets
+smp_size <- floor(0.50 * nrow(rushing_model_data))
+set.seed(2011) #go lions
+ind <- sample(seq_len(nrow(rushing_model_data)), size = smp_size)
+train <- as.matrix(rushing_model_data[ind, ])
+test <- as.matrix(rushing_model_data[-ind, ])
+
+dim(train)
+colnames(train)
+
+# Making the model
+ryoe_model <-
+  xgboost(
+    data = train[, 2:18],
+    label = train[, 1],
+    nrounds = 100,
+    objective = "reg:squarederror",
+    early_stopping_rounds = 3,
+    max_depth = 6,
+    eta = .25
+  )   
+
+vip(ryoe_model)
+
+xgb.plot.tree(model = ryoe_model, trees = 1)
+
+pred_xgb <- predict(ryoe_model, test[, 2:18])
+
+# Seeing our RMSE
+yhat <- pred_xgb
+y <- test[, 1]
+postResample(yhat, y)
+
+rushing_preds <- as.data.frame(
+  matrix(predict(ryoe_model, as.matrix(rushing_model_data %>% select(-label))))
+) %>%
+  dplyr::rename(exp_yards = V1)
+
+ryoe_projs <- cbind(rushing_data_join, rushing_preds)
+
+ryoe_projs |> 
+  mutate(ryoe = label - exp_yards) |> 
+  group_by(rusher_player_name) |> 
+  summarize(rushes = n(),
+            total_ryoe = sum(ryoe)) |> 
+  arrange(-total_ryoe)
+
 
 
